@@ -1064,9 +1064,11 @@ namespace RdEventTester{
             }
         };
         
-        template<size_t SeqLen,HistStr Prefix,typename TargetType>
+        template<size_t SeqLen,HistStr Prefix,typename TargetTypeA>
         class MultiObjectHistType:private NoMovable,NoCopyable{
             // メンバ変数をポインタで保持しているため
+            public:
+            using TargetType=TargetTypeA;
             private:
             const size_t cont;
             static constexpr auto histStrSeq=genHistStrSeq<SeqLen>(Prefix.data);
@@ -1204,9 +1206,14 @@ namespace RdEventTester{
                 // std::cout<<ctrlHistStrSeq[20].data()<<std::endl;
                 // std::cout<<genStr<6,9>("hello",9999).data()<<std::endl;
             }
-        MultiObjectHistType<30,"CTRL_",RdEvent::Ctrl> ctrl;
-        MultiObjectHistType<30,"LIST_",RdEvent::Listener> listener;
-        MultiObjectHistType<30,"BRAD_",RdEvent::Broadcaster> broadcaster;
+        using CtrlHistType=MultiObjectHistType<30,"CTRL_",RdEvent::Ctrl>;
+        CtrlHistType ctrl;
+
+        using ListenerHistType=MultiObjectHistType<30,"LIST_",RdEvent::Listener>;
+        ListenerHistType listener;
+
+        using BroadcasterHistType=MultiObjectHistType<30,"BRAD_",RdEvent::Broadcaster>;
+        BroadcasterHistType broadcaster;
 
         private:
         Tester::PatternHub total{
@@ -1236,38 +1243,72 @@ namespace RdEventTester{
         private:
         using IndexType=CmdIdContext::IndexType;
         TestMemoryLayer &memoryLayer;
-        
-        Tester::PatternHub broadcasterJoinNetwork{
-            Tester::PatternDefineSeq{
-                {
-                    .hist="broadcasterJoinNetwork",
-                    .checker=[=,this](Gila& g)mutable{
-                        
-                        auto [value,code]=g.cmdIdCtx.getStack<IndexType,IndexType>();
-                        auto [broadcasterIndex,ctrlIndex]=value;
-                        RdEvent::Broadcaster* broadP=memoryLayer.broadcaster.refIndexP(
-                            broadcasterIndex
-                        );
-                        RdEvent::Ctrl* ctrlP=memoryLayer.ctrl.refIndexP(
-                            ctrlIndex
-                        );
-                        
-                        ctrlP->addBroadcaster(*broadP);
-                        return AnsCode::OK;
-                    }
+
+        template<typename FirstHist,typename SecondHist>
+        class TwoCombine{
+            public:
+            using FirstType=FirstHist::TargetType;
+            using SecondType=SecondHist::TargetType;
+            using CallbackType=std::function<void(FirstType*,SecondType*,Gila&)>;
+            private:
+            CallbackType callbackFunc;
+            FirstHist &firstHist;
+            SecondHist &secondHist;
+            
+            Tester::PatternHub endHub{
+                Tester::PatternDefineSeq{
+                    {
+                        .hist="broadcasterJoinNetwork",
+                        .checker=[=,this](Gila& g)mutable{
+                            auto [value,code]=g.cmdIdCtx.getStack<IndexType,IndexType>();
+                            auto [firstIndex,secondIndex]=value;
+                            FirstType* firstP=firstHist.refIndexP(
+                                firstIndex
+                            );
+                            SecondType* secondP=secondHist.refIndexP(
+                                secondIndex
+                            );
+                            
+                            this->callbackFunc(firstP,secondP,g);
+                            return AnsCode::OK;
+                        }
+                    },
                 },
+            };
+            Tester::PatternHub secondHub{
+                this->secondHist.genUsableNumberPattern(),
+                &(this->endHub)
+            };
+            Tester::PatternHub firstHub{
+                this->firstHist.genUsableNumberPattern(),
+                &(this->secondHub)
+            };
+
+
+            public:
+            template<typename X>
+            TwoCombine(FirstHist &firstHist,SecondHist &secondHist,X&& x):
+                callbackFunc{std::forward<X>(x)},
+                firstHist{firstHist},secondHist{secondHist}
+                {}
+            Tester::PatternHub &refPatternHub(){
+                return this->firstHub;
             }
         };
 
-        Tester::PatternHub broadcasterJoinNetwork_ctrlIndex{
-            this->memoryLayer.ctrl.genUsableNumberPattern(),
-            &(this->broadcasterJoinNetwork)
-        };
-        Tester::PatternHub broadcasterJoinNetwork_broadcasterIndex{
-            this->memoryLayer.broadcaster.genUsableNumberPattern(),
-            &(this->broadcasterJoinNetwork_ctrlIndex)
-        };
 
+
+        TwoCombine<TestMemoryLayer::BroadcasterHistType,TestMemoryLayer::CtrlHistType>
+            broadcasterJoinNetwork{
+                
+                this->memoryLayer.broadcaster,
+                this->memoryLayer.ctrl,
+                [](auto* bp,auto* cp,Gila& g){
+                    cp->addBroadcaster(*bp);
+                }
+            };
+
+        
         Tester::PatternHub total{
             Tester::PatternDefineSeq{
                 {
@@ -1280,7 +1321,7 @@ namespace RdEventTester{
                         std::cout<<"4875 hellowwww"<<std::endl;
                         return AnsCode::OK;
                     },
-                    .child=&broadcasterJoinNetwork_broadcasterIndex,
+                    .child=&(broadcasterJoinNetwork.refPatternHub()),
                     
                 },
             }
@@ -1344,44 +1385,6 @@ namespace RdEventTester{
         }
 
         return;
-
-        // Gila gila;
-        // Tester::PatternHub hub2{
-        //     Tester::PatternDefineSeq{
-        //         {
-        //             "hub2_hello",
-        //             [](Gila &g){std::cout<<"2hello"<<std::endl;return AnsCode::OK;}
-        //         },{
-        //             "hub2_heelele",
-        //             [](Gila &g){std::cout<<"2heelele"<<std::endl;return AnsCode::OK;}
-        //         }
-        //     }
-        // };
-        // Tester::PatternHub hub{
-        //     Tester::PatternDefineSeq{
-        //         {
-        //             "hello",
-        //             [](Gila &g){std::cout<<"hello"<<std::endl;return AnsCode::OK;},
-        //             &hub2
-        //         },{
-        //             "heelele",
-        //             [](Gila &g){std::cout<<"heelele"<<std::endl;return AnsCode::OK;}
-        //         }
-        //     }
-        // };
-        
-        // std::cout<<"46874 hub cont"<<hub.getCont()<<std::endl;
-        // for(Id i=0;i<hub.getCont();i++){
-        //     Tester::HistorySeq histSeq;
-        //     // std::cout<<"4868 histSeq"<<&histSeq<<std::endl;
-        //     std::cout<<"4877 ID"<<i<<std::endl;
-        //     hub.procById(i,histSeq,gila);
-        //     std::cout<<"4682 histSeq size="<<histSeq.size()<<": ";
-        //     for(Tester::HistoryElem elem: histSeq){
-        //         std::cout<<elem<<", ";
-        //     }
-        //     std::cout<<std::endl;
-        // }
         
     }
 };
