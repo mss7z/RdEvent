@@ -166,6 +166,14 @@ class VariantMod{
     {
     }
 
+    template<typename T>
+        requires (!std::same_as<std::remove_cvref_t<T>, VariantMod>)
+    constexpr VariantMod& operator=(T&& t){
+        currentIdx=calcIndex<T,Types...>();
+        data=RecursiveUnion<Types...>(std::integral_constant<std::size_t, calcIndex<T,Types...>() >{}, std::forward<T>(t));
+        return *this;
+    }
+
     constexpr std::size_t index()const noexcept{
         return currentIdx;
     }
@@ -239,6 +247,9 @@ int main(){
 
     val.get<C>().c=43;
     val2.get<C>().c=44687;
+
+    val2=val;
+    val2=C{887987};
 
     std::cout<<val2.get<C>().c<<std::endl;
     return 0;
