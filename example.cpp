@@ -1,10 +1,13 @@
 #include <iostream>
 
-// ヘッダーファイルに全ての宣言を入れている。
+// ヘッダーファイルに全ての宣言・定義を入れている。
 // マイコンなどで実行バイナリの大きさが問題になる場合、実装部をソースファイルに分離することも今後検討する。
 #include "RdEvent.hpp"
 
 // RdEventは任意の型のイベントを扱えるように設計されている。
+// イベントの情報を格納するEventElemがある。
+// EventElemに加えて、イベントの事前情報を格納するEventPreInfoがある。
+// 事前情報があることによって、BroadcasterとListenerを事前に結びつけておくことで、RdEventは低負荷を図る。
 // ここでは最小限の例として、イベント本体は int、事前情報も int としてシンプルに構成した。
 using EventElem=int;
 using EventPreInfo=int;
