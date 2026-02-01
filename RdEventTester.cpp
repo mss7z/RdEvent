@@ -19,12 +19,11 @@
 
 
 
-using EventElem=int;
-using EventPreInfo=int;
-using RdEvent=RdEventTemplate<EventElem,EventPreInfo>;
-
-
 namespace RdEventTester{
+    using EventElem=int;
+    using EventPreInfo=int;
+    using RdEvent=RdEventNamespace::RdEventTemplate<EventElem,EventPreInfo>;
+
     void exitError(const std::string &msg){
         std::cerr<<msg<<std::endl;
         exit(1);

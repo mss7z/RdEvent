@@ -2,6 +2,16 @@
 
 #ifdef RDEVENT_DEBUG
     #include <iostream>
+#endif
+
+
+#include <cstddef>
+#include <new>
+#include <utility>
+
+namespace RdEventNamespace{
+
+#ifdef RDEVENT_DEBUG
     namespace{
         auto& dbg = std::cout;
         auto& endl = std::endl;
@@ -20,9 +30,6 @@
 #endif
 
 
-#include <cstddef>
-#include <new>
-#include <utility>
 
 enum RdEventError{
     OK = 0,
@@ -749,6 +756,9 @@ class RdEventTemplate{
         void printListener(){
             this->gila.printListener();
         }
+        bool isExistEvent(){
+            return !this->gila.refEventQue().isEmpty();
+        }
         Error procEvent(){
             dbg<<"12341 called procEvent"<<endl;
             auto& eventQue=this->gila.refEventQue();
@@ -793,3 +803,5 @@ class RdEventTemplate{
         }
     };
 };
+
+}//namespace RdEventNamespace
