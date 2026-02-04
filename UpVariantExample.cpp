@@ -157,6 +157,40 @@ class Em_GenInt{
     }
 };
 
+class Em_MultiListener{
+    private:
+    RdEvent::ListenerAsFunc listener1;
+    RdEvent::ListenerAsFunc listener2;
+
+    void setup(){
+        listener1.setFunc(
+            [](EventPreInfo val){
+                return val.isHold<Ev_Int>();
+            },
+            [](EventElem val){
+                std::cout<<"Em_MultiListener received Ev_Int "<<val.get<Ev_Int>().i<<std::endl;
+            }
+        );
+        listener2.setFunc(
+            [](EventPreInfo val){
+                return val.isHold<Ev_Float>();
+            },
+            [](EventElem val){
+                std::cout<<"Em_MultiListener received Ev_Float "<<val.get<Ev_Float>().f<<std::endl;
+            }
+        );
+        
+    }
+    public:
+    Em_MultiListener(RdEvent::Ctrl &ctrl){
+        setup();
+        ctrl.addListener(listener1);
+        ctrl.addListener(listener2);
+    }
+
+
+};
+
 int main(){
     // イベント空間（Ctrl オブジェクト）を定義する。
     RdEvent::Ctrl ctrl;
@@ -166,6 +200,7 @@ int main(){
     Em_PrintFloat printFloat{ctrl};
     Em_CalcHalf calcHalf{ctrl};
     Em_GenInt genInt{ctrl,10};
+    Em_MultiListener multiListener{ctrl};
 
     while(true){
         genInt.genNextInt();

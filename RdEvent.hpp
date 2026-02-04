@@ -4,6 +4,10 @@
     #include <iostream>
 #endif
 
+#define RDEVENT_ENABLE_LISTENER_AS_FUNC
+#ifdef RDEVENT_ENABLE_LISTENER_AS_FUNC
+    #include <functional>
+#endif
 
 #include <cstddef>
 #include <new>
@@ -587,7 +591,7 @@ class RdEventTemplate{
     };
 
     public:
-    class Listener{
+    class Listener:public NoCopyable{
         private:
         //この順番である必要あり（初期化順が重要）
         ListenerCore core;
@@ -607,6 +611,73 @@ class RdEventTemplate{
             return core.joinNetwork(gila);
         }
     };
+
+#ifdef RDEVENT_ENABLE_LISTENER_AS_FUNC
+    class ListenerAsFunc:private ListenerInterface{
+        friend ListenerCore;
+
+        public:
+        using ProcEventFuncType=std::function<void(EventElem)>;
+        using IsWantEventFuncType=std::function<bool(EventPreInfo)>;
+
+        private:
+        Listener listener;
+        ProcEventFuncType procEventFunc;
+        IsWantEventFuncType isWantEventFunc;
+
+        bool isWantEvent(EventPreInfo x) override{
+            return isWantEventFunc(x);
+        }
+        void procEvent(EventElem x) override{
+            procEventFunc(x);
+        }
+        Error trySetListener(){
+            if(procEventFunc && isWantEventFunc){
+                return listener.setListener(this);
+            }
+            return Error::OK;
+        }
+
+        public:
+        ListenerAsFunc(){}
+
+        // bool isWantEventFunc(EventPreInfo), void procEventFunc(EventElem) を設定する
+        ListenerAsFunc(
+            IsWantEventFuncType isWantEventFuncA,
+            ProcEventFuncType procEventFuncA
+        ):
+            procEventFunc(procEventFuncA),
+            isWantEventFunc(isWantEventFuncA)
+        {
+            trySetListener();
+        }
+
+        // bool isWantEventFunc(EventPreInfo), void procEventFunc(EventElem) を設定する
+        Error setFunc(
+            IsWantEventFuncType isWantEventFuncA,
+            ProcEventFuncType procEventFuncA
+        ){
+            procEventFunc=procEventFuncA;
+            isWantEventFunc=isWantEventFuncA;
+            return trySetListener();
+        }
+        Error setFuncProcEvent(
+            ProcEventFuncType procEventFuncA
+        ){
+            procEventFunc=procEventFuncA;
+            return trySetListener();
+        }
+        Error setFuncIsWantEvent(
+            IsWantEventFuncType isWantEventFuncA
+        ){
+            isWantEventFunc=isWantEventFuncA;
+            return trySetListener();
+        }
+        Error joinNetwork(Gila *gila){
+            return listener.joinNetwork(gila);
+        }
+    };
+#endif
 
     private:
     
@@ -750,6 +821,13 @@ class RdEventTemplate{
         Error addListener(Listener &listener){
             return listener.joinNetwork(&this->gila);
         }
+
+#ifdef RDEVENT_ENABLE_LISTENER_AS_FUNC
+        Error addListener(ListenerAsFunc &listener){
+            return listener.joinNetwork(&this->gila);
+        }
+#endif
+
         Error addBroadcaster(Broadcaster &broadcaster){
             return broadcaster.joinNetwork(&this->gila);
         }

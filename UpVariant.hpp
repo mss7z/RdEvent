@@ -467,7 +467,7 @@ class EventHandle{
     }
 
     template<typename Type>
-    bool isHold(){
+    bool isHold() const{
         if(memoryElemP==nullptr){
             throw std::runtime_error("disabled Event");
         }
