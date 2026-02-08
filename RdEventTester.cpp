@@ -20,6 +20,24 @@
 
 
 namespace RdEventTester{
+    class NoCopyable{
+        protected:
+        NoCopyable() = default;
+        ~NoCopyable() = default;
+
+        NoCopyable(const NoCopyable&) = delete;
+        NoCopyable& operator=(const NoCopyable&) = delete;
+    };
+
+    class NoMovable{
+        protected:
+        NoMovable() = default;
+        ~NoMovable() = default;
+
+        NoMovable(const NoMovable&&) = delete;
+        NoMovable& operator=(const NoMovable&&) = delete;
+    };
+
     using EventElem=int;
     using EventPreInfo=int;
     using RdEvent=RdEventNamespace::RdEventTemplate<EventElem,EventPreInfo>;
@@ -147,7 +165,7 @@ namespace RdEventTester{
             RetType ret;
             bool isSuccess=true;
             ([&](){
-                using TargetType=RemoveRef<decltype(std::get<Index>(ret))>::type;
+                using TargetType=std::remove_reference<decltype(std::get<Index>(ret))>::type;
                 if(stack[Index].type() != typeid(TargetType)){
                     isSuccess=false;
                     return;

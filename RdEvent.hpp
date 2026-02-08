@@ -5,13 +5,20 @@
 #endif
 
 #define RDEVENT_ENABLE_LISTENER_AS_FUNC
+#define RDEVENT_ENABLE_COPYABLE_INTERFACE
+
 #ifdef RDEVENT_ENABLE_LISTENER_AS_FUNC
     #include <functional>
+#endif
+
+#ifdef RDEVENT_ENABLE_COPYABLE_INTERFACE
+    #include <memory>
 #endif
 
 #include <cstddef>
 #include <new>
 #include <utility>
+#include <stdexcept>
 
 namespace RdEventNamespace{
 
@@ -796,7 +803,7 @@ class RdEventTemplate{
     };
 
     public:
-    class Broadcaster{
+    class BroadcasterAsStatic:public NoCopyable{
         private:
         BroadcasterCore core;
 
@@ -812,6 +819,30 @@ class RdEventTemplate{
         }
 
     };
+
+#ifndef RDEVENT_ENABLE_COPYABLE_INTERFACE
+    using Broadcaster=BroadcasterAsStatic;
+#endif
+
+#ifdef RDEVENT_ENABLE_COPYABLE_INTERFACE
+    class BroadcasterAsDynamic{
+        private:
+        std::shared_ptr<BroadcasterCore> core;
+        public:
+        BroadcasterAsDynamic():core{std::make_shared<BroadcasterCore>()}{}
+        BroadcasterAsDynamic(const BroadcasterAsDynamic &other):core{other.core}{}
+        Error joinNetwork(Gila *gila){
+            return core->joinNetwork(gila);
+        }
+        Error setEventPreInfo(EventPreInfo preInfo){
+            return core->setEventPreInfo(preInfo);
+        }
+        Error broadcast(EventElem event){
+            return core->broadcast(event);
+        }
+    };
+    using Broadcaster=BroadcasterAsDynamic;
+#endif
 
     class Ctrl{
         private:
