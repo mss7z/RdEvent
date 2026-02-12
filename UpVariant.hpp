@@ -92,11 +92,8 @@ union RecursiveUnion{
     TargetType data;
     RecursiveUnion<Rest...> rest;
 
-    RecursiveUnion()=delete;
-    RecursiveUnion(const RecursiveUnion&)=default;
-    RecursiveUnion(RecursiveUnion&&)=default;
-    RecursiveUnion& operator=(const RecursiveUnion&)=default;
-    RecursiveUnion& operator=(RecursiveUnion&&)=default;
+    public:
+    ~RecursiveUnion(){}
 
     template<std::size_t Idx,typename T>
     constexpr RecursiveUnion(std::integral_constant<std::size_t,Idx>,T&& dataA):
@@ -108,6 +105,21 @@ union RecursiveUnion{
     constexpr RecursiveUnion(std::integral_constant<std::size_t,0>,T&& dataA):
         data(std::forward<T>(dataA))
     {    
+    }
+
+    constexpr RecursiveUnion(const std::size_t idx, const RecursiveUnion &other){
+        if(idx==0){
+            new(&data) TargetType{ other.data };
+        }else{
+            new(&rest) RecursiveUnion<Rest...>{ idx-1, other.rest };
+        }
+    }
+    constexpr RecursiveUnion(const std::size_t idx, RecursiveUnion &&other){
+        if(idx==0){
+            new(&data) TargetType{ std::move(other.data) };
+        }else{
+            new(&rest) RecursiveUnion<Rest...>{ idx-1, std::move(other.rest) };
+        }
     }
 
     template<std::size_t Idx>
@@ -154,16 +166,19 @@ template<typename TargetType>
 union RecursiveUnion<TargetType>{
     TargetType data;
 
-    RecursiveUnion()=delete;
-    RecursiveUnion(const RecursiveUnion&)=default;
-    RecursiveUnion(RecursiveUnion&&)=default;
-    RecursiveUnion& operator=(const RecursiveUnion&)=default;
-    RecursiveUnion& operator=(RecursiveUnion&&)=default;
+    ~RecursiveUnion(){}
 
     template<typename T>
     constexpr RecursiveUnion(std::integral_constant<std::size_t,0>,T&& dataA):
         data(std::forward<T>(dataA))
     {    
+    }
+
+    constexpr RecursiveUnion(const std::size_t idx, const RecursiveUnion &other){
+        new(&data) TargetType{ other.data };
+    }
+    constexpr RecursiveUnion(const std::size_t idx, RecursiveUnion &&other){
+        new(&data) TargetType{ std::move(other.data) };
     }
 
     template<std::size_t Idx>
@@ -182,6 +197,7 @@ union RecursiveUnion<TargetType>{
     }
 
     constexpr void del(const std::size_t idx){
+        dbgAssert(idx==0,"logic error");
         if constexpr( !(std::is_trivially_destructible_v<TargetType>)){
             data.~TargetType();
         }
@@ -217,11 +233,31 @@ class UpVariant{
     public:
 
     UpVariant()=delete;
-    UpVariant(const UpVariant&)=default;
-    UpVariant(UpVariant&&)=default;
-    UpVariant& operator=(const UpVariant&)=default;
-    UpVariant& operator=(UpVariant&&)=default;
+    UpVariant(const UpVariant& other):
+        currentIdx{other.currentIdx},
+        data{other.currentIdx, other.data}
+    {}
 
+    UpVariant(UpVariant&& other):
+        currentIdx{other.currentIdx},
+        data{other.currentIdx, std::move(other.data)}
+    {}
+    UpVariant& operator=(const UpVariant& other){
+        data.del(currentIdx);
+        currentIdx=other.currentIdx;
+        new(&data) RecursiveUnion<Types...>{ currentIdx, other.data};
+        return *this;
+    }
+    UpVariant& operator=(UpVariant&& other){
+        data.del(currentIdx);
+        currentIdx=other.currentIdx;
+        new(&data) RecursiveUnion<Types...>{ currentIdx, std::move(other.data) };
+        return *this;
+    }
+
+    ~UpVariant(){
+        data.del(currentIdx);
+    }
 
     template<typename T>
         requires (!std::same_as<std::remove_cvref_t<T>, UpVariant>)
@@ -234,8 +270,9 @@ class UpVariant{
     template<typename T>
         requires (!std::same_as<std::remove_cvref_t<T>, UpVariant>)
     constexpr UpVariant& operator=(T&& t){
+        data.del(currentIdx);
         currentIdx=calcIndex<T,Types...>();
-        data=RecursiveUnion<Types...>(std::integral_constant<std::size_t, calcIndex<T,Types...>() >{}, std::forward<T>(t));
+        new(&data) RecursiveUnion<Types...>(std::integral_constant<std::size_t, calcIndex<T,Types...>() >{}, std::forward<T>(t));
         return *this;
     }
 
